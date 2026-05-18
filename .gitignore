@@ -57,3 +57,12 @@ dmypy.json
 
 # User Uploads
 uploads/
+
+# Static Files
+static/
+
+# Media Files
+media/
+
+# Database backups
+db_backups/
