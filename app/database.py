@@ -22,9 +22,18 @@ def get_db():
 # Add this function to create tables
 def create_tables():
     """Create all database tables"""
+    from sqlalchemy import text
     from app.models.user import User  # Import your models here
     from app.models.book import Book
     from app.models.wishlist import Wishlist
     from app.models.cart import Cart
+    
+    # Attempt to add the new column to existing database
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE books ADD COLUMN is_sold BOOLEAN DEFAULT 0"))
+    except Exception:
+        pass # Column likely already exists
+        
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from app.schemas.user import UserResponse
 
@@ -12,6 +12,7 @@ class BookBase(BaseModel):
     location: str
     category: str
     images: Optional[List[str]] = Field(default=[], max_items=5)
+    is_sold: bool = False
 
     @field_validator('condition')
     @classmethod
@@ -45,6 +46,8 @@ class BookUpdate(BaseModel):
     location: Optional[str] = None
     category: Optional[str] = None
     images: Optional[List[str]] = Field(None, max_items=5)
+    is_sold: Optional[bool] = None
+    is_deleted: Optional[bool] = None
 
 class BookResponse(BaseModel):
     id: int
@@ -57,6 +60,9 @@ class BookResponse(BaseModel):
     location: str
     category: str
     images: Optional[List[str]] = []
+    is_sold: bool
+    is_deleted: bool
+    deleted_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     owner: Optional[UserResponse] = None
@@ -89,4 +95,8 @@ class BookListResponse(BaseModel):
 
 class BookSingleResponse(BaseModel):
     data: BookResponse
+    message: str
+
+class DeleteResponse(BaseModel):
+    data: Any
     message: str

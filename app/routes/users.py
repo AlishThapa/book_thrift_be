@@ -97,7 +97,11 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         db.refresh(db_user)
 
     return {
-        "data": {"access_token": db_user.access_token, "token_type": "bearer"},
+        "data": {
+            "access_token": db_user.access_token,
+            "token_type": "bearer",
+            "user": UserResponse.from_orm(db_user)
+        },
         "message": "Login successful"
     }
 

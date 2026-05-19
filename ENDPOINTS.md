@@ -42,7 +42,7 @@ All routes are prefixed with `/api`.
     - Request body (JSON):
         - `email` (string, valid email)
         - `password` (string)
-    - Response: `200 OK` with token info in `data`
+    - Response: `200 OK` with token info and user details (including `uid`, `email`, `full_name`, etc.) in `data`
 
 - **GET /api/get-profile** — Get User Profile
     - Description: Retrieve profile details for the authenticated user
@@ -99,6 +99,31 @@ All routes are prefixed with `/api`.
         - `images` (file, multiple allowed, max 5)
     - Response: `201 Created` with created book object in `data`
 
+- **PUT /api/edit-book/{book_id}** — Edit a book post
+    - Description: Edit a book's details. Only the owner can edit, and sold books cannot be edited.
+    - Authentication: Bearer Token
+    - Path Parameter:
+        - `book_id` (int, required)
+    - Request Body (JSON, all fields optional):
+        - `title`, `condition`, `price`, `quantity`, `description`, `location`, `category`, `images`
+    - Response: `200 OK` with updated book object in `data`
+
+- **DELETE /api/delete-book/{book_id}** — Soft-delete a book
+    - Description: Soft-deletes a book. Only the owner can delete, and sold books cannot be deleted.
+    - Authentication: Bearer Token
+    - Path Parameter:
+        - `book_id` (int, required)
+    - Response: `200 OK`
+
+- **PUT /api/update-book-status/{book_id}** — Mark a book as sold/unsold
+    - Description: Allows the owner to change the `is_sold` status of a book.
+    - Authentication: Bearer Token
+    - Path Parameter:
+        - `book_id` (int, required)
+    - Query Parameter:
+        - `is_sold` (bool, required)
+    - Response: `200 OK` with updated book object in `data`
+
 - **GET /api/get-books** — List books (with filters)
     - Description: Get list of books for sale with optional filtering
     - Authentication: Optional (Bearer Token to get `is_wishlisted` status)
@@ -128,6 +153,36 @@ All routes are prefixed with `/api`.
     - Authentication: Bearer Token
     - Response: `200 OK` with list of wishlisted books in `data`. Each book includes `is_wishlisted` as `true`.
 
+- **GET /api/my-listings** — Get user's book listings
+    - Description: Returns a list of all books the authenticated user has posted, with an option to filter by status.
+    - Authentication: Bearer Token
+    - Query Parameters:
+        - `listing_status` (string, optional, default: "active") - Filter by status. Can be `active`, `sold`, or `all`.
+    - Response: `200 OK` with a list of book objects in `data`.
+
+## Bin Endpoints
+
+All routes are prefixed with `/api`.
+
+- **GET /api/bin** — Get user's bin
+    - Description: Returns a list of books that the authenticated user has soft-deleted.
+    - Authentication: Bearer Token
+    - Response: `200 OK` with a list of book objects in `data`.
+
+- **POST /api/books/{book_id}/recover** — Recover a soft-deleted book
+    - Description: Recovers a book from the user's bin.
+    - Authentication: Bearer Token
+    - Path Parameter:
+        - `book_id` (int, required) - ID of the book to recover.
+    - Response: `200 OK` with a success message.
+
+- **DELETE /api/bin/{book_id}** — Permanently delete a book
+    - Description: Permanently deletes a book from the user's bin.
+    - Authentication: Bearer Token
+    - Path Parameter:
+        - `book_id` (int, required) - ID of the book to permanently delete.
+    - Response: `200 OK` with a success message.
+
 ## Cart Endpoints
 
 All routes are prefixed with `/api/cart`.
@@ -141,12 +196,12 @@ All routes are prefixed with `/api/cart`.
     - Error Responses:
         - `400 Bad Request` if `cart_amount >= book.quantity` (e.g. `{"details": "Cannot add more. Only {quantity} copy/copies available."}`)
 
-- `**POST /api/cart/decrement** — Decrement Book Quantity in Cart
+- **POST /api/cart/decrement** — Decrement Book Quantity in Cart
     - Description: Decrements the quantity of a book in the user's cart by 1. The quantity will not go below 1.
     - Authentication: Bearer Token
     - Request Body (JSON):
         - `book_id` (int, required)
-    - Response: `200 OK` with `updated cart amount `{"cart_amount": ...}` in `data`
+    - Response: `200 OK` with updated cart amount `{"cart_amount": ...}` in `data`
     - Error Responses:
         - `404 Not Found` if the book is not in the cart.
 

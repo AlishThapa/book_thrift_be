@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import os
 import uuid
+from datetime import datetime
 from app.database import get_db
 from app.models.book import Book
-from app.schemas.book import BookListResponse, BookSingleResponse, BookResponse
+from app.schemas.book import BookListResponse, BookSingleResponse, BookUpdate, DeleteResponse
 from app.schemas.wishlist import WishlistToggleResponse
 from app.auth import get_current_user, get_current_user_optional
 from app.models.user import User
@@ -97,6 +98,100 @@ async def create_book(
         "message": "Book posted successfully"
     }
 
+@router.put("/edit-book/{book_id}", response_model=BookSingleResponse)
+async def edit_book(
+    book_id: int,
+    book_update: BookUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the book
+    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
+
+    # Check if the book exists
+    if not db_book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Check if the current user is the owner
+    if db_book.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to edit this book")
+
+    # Check if the book is sold
+    if db_book.is_sold:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot edit a sold book")
+
+    # Update the book with new data
+    update_data = book_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_book, key, value)
+
+    db.commit()
+    db.refresh(db_book)
+
+    return {
+        "data": db_book,
+        "message": "Book updated successfully"
+    }
+
+@router.delete("/delete-book/{book_id}", response_model=DeleteResponse)
+def delete_book(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the book
+    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
+
+    # Check if the book exists
+    if not db_book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Check if the current user is the owner
+    if db_book.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to delete this book")
+
+    # Check if the book is sold
+    if db_book.is_sold:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a sold book")
+
+    # Perform a soft delete
+    db_book.is_deleted = True
+    db_book.deleted_at = datetime.utcnow()
+    db.commit()
+
+    return {
+        "data": None,
+        "message": "Book deleted successfully"
+    }
+
+@router.put("/update-book-status/{book_id}", response_model=BookSingleResponse)
+def update_book_status(
+    book_id: int,
+    is_sold: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Fetch the book
+    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
+
+    # Check if the book exists
+    if not db_book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    # Check if the current user is the owner
+    if db_book.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to update this book")
+
+    # Update the is_sold status
+    db_book.is_sold = is_sold
+    db.commit()
+    db.refresh(db_book)
+
+    return {
+        "data": db_book,
+        "message": f"Book status updated to {'sold' if is_sold else 'active'}"
+    }
+
 @router.get("/get-books", response_model=BookListResponse)
 def get_books(
     category: Optional[List[str]] = Query(None),
@@ -106,7 +201,7 @@ def get_books(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    query = db.query(Book).options(joinedload(Book.owner))
+    query = db.query(Book).options(joinedload(Book.owner)).filter(Book.is_deleted == False)
 
     if category:
         # If multiple categories are provided, filter by any of them
@@ -148,7 +243,7 @@ def get_book_details(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    book = db.query(Book).options(joinedload(Book.owner)).filter(Book.id == book_id).first()
+    book = db.query(Book).options(joinedload(Book.owner)).filter(Book.id == book_id, Book.is_deleted == False).first()
 
     if not book:
         raise HTTPException(
@@ -173,8 +268,8 @@ def toggle_wishlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Check if the book exists
-    book = db.query(Book).filter(Book.id == book_id).first()
+    # Check if the book exists and is not deleted
+    book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
     if not book:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -221,7 +316,7 @@ def get_wishlist(
             "message": "Wishlist is empty"
         }
 
-    books = db.query(Book).options(joinedload(Book.owner)).filter(Book.id.in_(wishlisted_book_ids)).all()
+    books = db.query(Book).options(joinedload(Book.owner)).filter(Book.id.in_(wishlisted_book_ids), Book.is_deleted == False).all()
 
     # All these books are wishlisted
     for book in books:
@@ -230,4 +325,29 @@ def get_wishlist(
     return {
         "data": books,
         "message": "Wishlist fetched successfully"
+    }
+
+@router.get("/my-listings", response_model=BookListResponse)
+def get_my_listings(
+    listing_status: str = Query("active", description="Filter by status: 'active', 'sold', or 'all'"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = db.query(Book).filter(Book.owner_id == current_user.id, Book.is_deleted == False)
+
+    if listing_status == "active":
+        query = query.filter(Book.is_sold == False)
+    elif listing_status == "sold":
+        query = query.filter(Book.is_sold == True)
+    elif listing_status != "all":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid status parameter. Use 'active', 'sold', or 'all'."
+        )
+
+    books = query.all()
+
+    return {
+        "data": books,
+        "message": f"Successfully retrieved {listing_status} listings."
     }
