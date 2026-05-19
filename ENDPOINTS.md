@@ -139,7 +139,7 @@ All routes are prefixed with `/api`.
     - Authentication: Optional (Bearer Token to get `is_wishlisted` status)
     - Query Parameters:
         - `book_id` (int, required) - ID of the book
-    - Response: `200 OK` with book object (including nested `owner` details and `is_wishlisted` flag) in `data`
+    - Response: `200 OK` with book object (including nested `owner` details, `is_wishlisted` flag, and `similar_books` list) in `data`
 
 - **POST /api/toggle-wishlist** — Toggle wishlist status
     - Description: Adds a book to the user's wishlist if it's not already there, or removes it if it is.

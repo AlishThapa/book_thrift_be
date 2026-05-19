@@ -67,6 +67,7 @@ class BookResponse(BaseModel):
     updated_at: Optional[datetime] = None
     owner: Optional[UserResponse] = None
     is_wishlisted: Optional[bool] = False
+    similar_books: Optional[List['BookResponse']] = None
 
     class Config:
         from_attributes = True

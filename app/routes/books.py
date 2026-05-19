@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from typing import List, Optional
 import os
 import uuid
 from datetime import datetime
+import random
 from app.database import get_db
 from app.models.book import Book
 from app.schemas.book import BookListResponse, BookSingleResponse, BookUpdate, DeleteResponse
@@ -256,6 +258,15 @@ def get_book_details(
         book.is_wishlisted = wishlist_item is not None
     else:
         book.is_wishlisted = False
+
+    # Fetch similar books from the same owner
+    similar_books = db.query(Book).filter(
+        Book.owner_id == book.owner_id,
+        Book.id != book.id,
+        Book.is_deleted == False
+    ).order_by(func.random()).limit(5).all()
+
+    book.similar_books = similar_books
 
     return {
         "data": book,
