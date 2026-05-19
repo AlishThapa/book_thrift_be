@@ -128,6 +128,24 @@ All routes are prefixed with `/api`.
     - Authentication: Bearer Token
     - Response: `200 OK` with list of wishlisted books in `data`. Each book includes `is_wishlisted` as `true`.
 
+## Cart Endpoints
+
+All routes are prefixed with `/api/cart`.
+
+- **POST /api/cart/add** — Add Book to Cart
+    - Description: Adds a book to the user's cart or increments its quantity if it already exists. Validates against available stock.
+    - Authentication: Bearer Token
+    - Request Body (JSON):
+        - `book_id` (int, required)
+    - Response: `200 OK` with updated cart amount `{"cart_amount": ...}` in `data`
+    - Error Responses:
+        - `400 Bad Request` if `cart_amount >= book.quantity` (e.g. `{"details": "Cannot add more. Only {quantity} copy/copies available."}`)
+
+- **GET /api/cart** — Get User's Cart data
+    - Description: Returns all books in the authenticated user's cart. Includes cart item details (like `cart_amount`) and all nested book details (including available quantity).
+    - Authentication: Bearer Token
+    - Response: `200 OK` with list of cart items in `data`. Each item includes nested `book` details.
+
 ## Static Files
 
 - **GET /uploads/{filename}** — Access uploaded book images

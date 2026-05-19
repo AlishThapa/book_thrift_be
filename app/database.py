@@ -25,5 +25,6 @@ def create_tables():
     from app.models.user import User  # Import your models here
     from app.models.book import Book
     from app.models.wishlist import Wishlist
+    from app.models.cart import Cart
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")

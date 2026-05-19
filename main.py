@@ -10,6 +10,7 @@ from app.database import create_tables
 # Import routers
 from app.routes.users import router as users_router
 from app.routes.books import router as books_router
+from app.routes.cart import router as cart_router
 
 # Create database tables before starting the app
 create_tables()
@@ -64,6 +65,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(users_router)
 app.include_router(books_router)
+app.include_router(cart_router)
 
 @app.get("/")
 async def root():
