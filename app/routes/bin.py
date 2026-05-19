@@ -33,6 +33,24 @@ def get_bin(db: Session = Depends(get_db), current_user: User = Depends(get_curr
         "message": "Bin fetched successfully"
     }
 
+@router.post("/books/all/recover", status_code=status.HTTP_200_OK)
+def recover_all_books(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    books = db.query(Book).filter(Book.owner_id == current_user.id, Book.is_deleted == True).all()
+
+    if not books:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No books found in bin")
+
+    for book in books:
+        book.is_deleted = False
+        book.deleted_at = None
+        
+    db.commit()
+
+    return {
+        "data": None,
+        "message": "All books recovered successfully"
+    }
+
 @router.post("/books/{book_id}/recover", status_code=status.HTTP_200_OK)
 def recover_book(book_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     book = db.query(Book).filter(Book.id == book_id, Book.owner_id == current_user.id).first()
@@ -45,6 +63,23 @@ def recover_book(book_id: int, db: Session = Depends(get_db), current_user: User
     db.commit()
 
     return {"message": "Book recovered successfully"}
+
+@router.delete("/bin/delete-all", status_code=status.HTTP_200_OK)
+def permanently_delete_all_books(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    books = db.query(Book).filter(Book.owner_id == current_user.id, Book.is_deleted == True).all()
+
+    if not books:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No books found in bin")
+
+    for book in books:
+        db.delete(book)
+        
+    db.commit()
+
+    return {
+        "data": None,
+        "message": "All books permanently deleted"
+    }
 
 @router.delete("/bin/{book_id}", status_code=status.HTTP_200_OK)
 def permanently_delete_book(book_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

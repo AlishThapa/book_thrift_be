@@ -169,11 +169,21 @@ All routes are prefixed with `/api`.
     - Authentication: Bearer Token
     - Response: `200 OK` with a list of book objects in `data`.
 
+- **POST /api/books/all/recover** — Recover all soft-deleted books
+    - Description: Recovers all books from the user's bin.
+    - Authentication: Bearer Token
+    - Response: `200 OK` with a success message.
+
 - **POST /api/books/{book_id}/recover** — Recover a soft-deleted book
     - Description: Recovers a book from the user's bin.
     - Authentication: Bearer Token
     - Path Parameter:
         - `book_id` (int, required) - ID of the book to recover.
+    - Response: `200 OK` with a success message.
+
+- **DELETE /api/bin/delete-all** — Permanently delete all books
+    - Description: Permanently deletes all books from the user's bin.
+    - Authentication: Bearer Token
     - Response: `200 OK` with a success message.
 
 - **DELETE /api/bin/{book_id}** — Permanently delete a book
