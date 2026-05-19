@@ -108,10 +108,10 @@ All routes are prefixed with `/api`.
         - `title`, `condition`, `price`, `quantity`, `description`, `location`, `category`, `images`
     - Response: `200 OK` with updated book object in `data`
 
-- **DELETE /api/delete-book/{book_id}** — Soft-delete a book
+- **GET /api/delete-book** — Soft-delete a book
     - Description: Soft-deletes a book. Only the owner can delete, and sold books cannot be deleted.
     - Authentication: Bearer Token
-    - Path Parameter:
+    - Query Parameter:
         - `book_id` (int, required)
     - Response: `200 OK`
 

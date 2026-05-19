@@ -133,9 +133,9 @@ async def edit_book(
         "message": "Book updated successfully"
     }
 
-@router.delete("/delete-book/{book_id}", response_model=DeleteResponse)
+@router.get("/delete-book", response_model=DeleteResponse)
 def delete_book(
-    book_id: int,
+    book_id: int = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
