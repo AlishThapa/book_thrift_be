@@ -141,6 +141,24 @@ All routes are prefixed with `/api/cart`.
     - Error Responses:
         - `400 Bad Request` if `cart_amount >= book.quantity` (e.g. `{"details": "Cannot add more. Only {quantity} copy/copies available."}`)
 
+- `**POST /api/cart/decrement** — Decrement Book Quantity in Cart
+    - Description: Decrements the quantity of a book in the user's cart by 1. The quantity will not go below 1.
+    - Authentication: Bearer Token
+    - Request Body (JSON):
+        - `book_id` (int, required)
+    - Response: `200 OK` with `updated cart amount `{"cart_amount": ...}` in `data`
+    - Error Responses:
+        - `404 Not Found` if the book is not in the cart.
+
+- **DELETE /api/cart/remove** — Remove Book(s) from Cart
+    - Description: Removes one or more books from the user's cart.
+    - Authentication: Bearer Token
+    - Request Body (JSON):
+        - `book_ids` (list of int, required) - A list of book IDs to remove.
+    - Response: `200 OK` with the count of deleted items `{"deleted_count": ...}` in `data`
+    - Error Responses:
+        - `404 Not Found` if no matching books are found in the cart to remove.
+
 - **GET /api/cart** — Get User's Cart data
     - Description: Returns all books in the authenticated user's cart. Includes cart item details (like `cart_amount`) and all nested book details (including available quantity).
     - Authentication: Bearer Token

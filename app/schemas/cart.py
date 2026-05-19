@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime
 from .book import BookResponse
 
@@ -22,6 +22,20 @@ class CartItemResponse(BaseModel):
 
 
 class AddToCartResponse(BaseModel):
+    data: dict
+    message: str
+
+
+class DecrementCartItemResponse(BaseModel):
+    data: dict
+    message: str
+
+
+class RemoveCartItems(BaseModel):
+    book_ids: List[int]
+
+
+class RemoveCartItemsResponse(BaseModel):
     data: dict
     message: str
 
