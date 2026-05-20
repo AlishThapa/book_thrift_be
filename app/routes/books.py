@@ -26,6 +26,8 @@ async def create_book(
     quantity: int = Form(1),
     description: str = Form(""),
     location: str = Form(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
     category: str = Form(...),
     images: List[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -86,6 +88,8 @@ async def create_book(
         quantity=quantity,
         description=description,
         location=location,
+        latitude=latitude,
+        longitude=longitude,
         category=category,
         images=image_urls,
         owner_id=current_user.id
@@ -100,139 +104,59 @@ async def create_book(
         "message": "Book posted successfully"
     }
 
-@router.put("/edit-book/{book_id}", response_model=BookSingleResponse)
-async def edit_book(
-    book_id: int,
-    book_update: BookUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch the book
-    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
-
-    # Check if the book exists
-    if not db_book:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-
-    # Check if the current user is the owner
-    if db_book.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to edit this book")
-
-    # Check if the book is sold
-    if db_book.is_sold:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot edit a sold book")
-
-    # Update the book with new data
-    update_data = book_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_book, key, value)
-
-    db.commit()
-    db.refresh(db_book)
-
-    return {
-        "data": db_book,
-        "message": "Book updated successfully"
-    }
-
-@router.get("/delete-book", response_model=DeleteResponse)
-def delete_book(
-    book_id: int = Query(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch the book
-    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
-
-    # Check if the book exists
-    if not db_book:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-
-    # Check if the current user is the owner
-    if db_book.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to delete this book")
-
-    # Check if the book is sold
-    if db_book.is_sold:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete a sold book")
-
-    # Perform a soft delete
-    db_book.is_deleted = True
-    db_book.deleted_at = datetime.utcnow()
-    db.commit()
-
-    return {
-        "data": None,
-        "message": "Book deleted successfully"
-    }
-
-@router.put("/update-book-status/{book_id}", response_model=BookSingleResponse)
-def update_book_status(
-    book_id: int,
-    is_sold: bool,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Fetch the book
-    db_book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
-
-    # Check if the book exists
-    if not db_book:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
-
-    # Check if the current user is the owner
-    if db_book.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not authorized to update this book")
-
-    # Update the is_sold status
-    db_book.is_sold = is_sold
-    db.commit()
-    db.refresh(db_book)
-
-    return {
-        "data": db_book,
-        "message": f"Book status updated to {'sold' if is_sold else 'active'}"
-    }
-
 @router.get("/get-books", response_model=BookListResponse)
 def get_books(
-    category: Optional[List[str]] = Query(None),
-    search: Optional[str] = Query(None),
-    min_price: Optional[float] = Query(None),
-    max_price: Optional[float] = Query(None),
+    request: Request,
+    search: Optional[str] = None,
+    condition: Optional[str] = None,
+    category: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    sort_by: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    query = db.query(Book).options(joinedload(Book.owner)).filter(Book.is_deleted == False)
+    query = db.query(Book).filter(Book.is_deleted == False, Book.is_sold == False)
+
+    if search:
+        query = query.filter(Book.title.ilike(f"%{search}%"))
+    
+    if condition:
+        query = query.filter(Book.condition == condition)
 
     if category:
-        # If multiple categories are provided, filter by any of them
-        query = query.filter(Book.category.in_(category))
-    
-    if search:
-        search_filter = f"%{search}%"
-        query = query.filter(
-            (Book.title.ilike(search_filter)) | 
-            (Book.description.ilike(search_filter))
-        )
-    
+        query = query.filter(Book.category == category)
+
     if min_price is not None:
         query = query.filter(Book.price >= min_price)
-    
+
     if max_price is not None:
         query = query.filter(Book.price <= max_price)
 
-    books = query.all()
+    if sort_by:
+        if sort_by == "price_asc":
+            query = query.order_by(Book.price.asc())
+        elif sort_by == "price_desc":
+            query = query.order_by(Book.price.desc())
+        elif sort_by == "date_desc":
+            query = query.order_by(Book.created_at.desc())
+        elif sort_by == "date_asc":
+            query = query.order_by(Book.created_at.asc())
+        elif sort_by == "popularity":
+            query = query.outerjoin(Wishlist, Book.id == Wishlist.book_id)\
+                         .group_by(Book.id)\
+                         .order_by(func.count(Wishlist.book_id).desc())
+
+    # Pagination
+    offset = (page - 1) * page_size
+    books = query.offset(offset).limit(page_size).all()
 
     if current_user:
-        user_wishlist = db.query(Wishlist.book_id).filter(Wishlist.user_id == current_user.id).all()
-        wishlisted_book_ids = {book_id for (book_id,) in user_wishlist}
-
+        wishlist_book_ids = {item.book_id for item in db.query(Wishlist).filter(Wishlist.user_id == current_user.id).all()}
         for book in books:
-            book.is_wishlisted = book.id in wishlisted_book_ids
-    else:
-        for book in books:
-            book.is_wishlisted = False
+            book.is_wishlisted = book.id in wishlist_book_ids
 
     return {
         "data": books,
@@ -246,95 +170,209 @@ def get_book_details(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     book = db.query(Book).options(joinedload(Book.owner)).filter(Book.id == book_id, Book.is_deleted == False).first()
-
     if not book:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Book not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
 
     if current_user:
-        wishlist_item = db.query(Wishlist).filter(Wishlist.user_id == current_user.id, Wishlist.book_id == book_id).first()
-        book.is_wishlisted = wishlist_item is not None
-    else:
-        book.is_wishlisted = False
+        book.is_wishlisted = db.query(Wishlist).filter(
+            Wishlist.user_id == current_user.id,
+            Wishlist.book_id == book_id
+        ).first() is not None
 
-    # Fetch similar books from the same owner
+    # Get 4 similar books from the same category, excluding the current book
     similar_books = db.query(Book).filter(
-        Book.owner_id == book.owner_id,
+        Book.category == book.category,
         Book.id != book.id,
-        Book.is_deleted == False
-    ).order_by(func.random()).limit(5).all()
+        Book.is_deleted == False,
+        Book.is_sold == False
+    ).order_by(func.random()).limit(4).all()
 
-    book.similar_books = similar_books
+    # If there are similar books, attach them to the book response
+    if similar_books:
+        if current_user:
+            wishlist_book_ids = {item.book_id for item in db.query(Wishlist).filter(Wishlist.user_id == current_user.id).all()}
+            for b in similar_books:
+                b.is_wishlisted = b.id in wishlist_book_ids
+        book.similar_books = similar_books
 
     return {
         "data": book,
         "message": "Book details fetched successfully"
     }
 
-@router.post("/toggle-wishlist", response_model=WishlistToggleResponse)
-def toggle_wishlist(
-    book_id: int = Query(...),
+@router.put("/update-book/{book_id}", response_model=BookSingleResponse)
+async def update_book(
+    book_id: int,
+    title: str = Form(None),
+    condition: str = Form(None),
+    price: float = Form(None),
+    quantity: int = Form(None),
+    description: str = Form(None),
+    location: str = Form(None),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    category: str = Form(None),
+    images: List[UploadFile] = File(None),
+    is_sold: bool = Form(None),
+    is_deleted: bool = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Check if the book exists and is not deleted
-    book = db.query(Book).filter(Book.id == book_id, Book.is_deleted == False).first()
-    if not book:
+    db_book = db.query(Book).filter(Book.id == book_id).first()
+    if not db_book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    if db_book.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this book")
+
+    update_data = {
+        "title": title,
+        "condition": condition,
+        "price": price,
+        "quantity": quantity,
+        "description": description,
+        "location": location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "category": category,
+        "is_sold": is_sold,
+        "is_deleted": is_deleted
+    }
+    update_data = {k: v for k, v in update_data.items() if v is not None}
+
+    if condition:
+        condition = condition.lower()
+        if condition not in ["new", "like new", "used", "old"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Condition must be one of: new, like new, used, old"
+            )
+        update_data["condition"] = condition
+
+    if quantity is not None and quantity < 1:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Book not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Quantity must be at least 1"
         )
 
-    # Check if it's already in the wishlist
+    if price is not None and price < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Price cannot be negative"
+        )
+
+    if is_deleted:
+        db_book.is_deleted = True
+        db_book.deleted_at = datetime.utcnow()
+        db.commit()
+        db.refresh(db_book)
+        return {
+            "data": db_book,
+            "message": "Book marked as deleted"
+        }
+
+    # Handle image uploads
+    if images and images[0].filename != "":
+        if len(images) > 5:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum 5 images allowed"
+            )
+
+        image_urls = []
+        for image in images:
+            file_extension = os.path.splitext(image.filename)[1]
+            if not file_extension:
+                file_extension = ".jpg"
+
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+            try:
+                with open(file_path, "wb") as buffer:
+                    content = await image.read()
+                    buffer.write(content)
+                image_urls.append(f"/uploads/{unique_filename}")
+            except Exception as e:
+                print(f"File upload error: {e}")
+        
+        update_data["images"] = image_urls
+
+    for key, value in update_data.items():
+        setattr(db_book, key, value)
+
+    db.commit()
+    db.refresh(db_book)
+
+    return {
+        "data": db_book,
+        "message": "Book updated successfully"
+    }
+
+@router.delete("/delete-book/{book_id}", response_model=DeleteResponse)
+def delete_book(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_book = db.query(Book).filter(Book.id == book_id).first()
+    if not db_book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
+    if db_book.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this book")
+
+    db.delete(db_book)
+    db.commit()
+
+    return {
+        "data": None,
+        "message": "Book deleted permanently"
+    }
+
+@router.post("/wishlist/toggle/{book_id}", response_model=WishlistToggleResponse)
+def toggle_wishlist(
+    book_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")
+
     wishlist_item = db.query(Wishlist).filter(
         Wishlist.user_id == current_user.id,
         Wishlist.book_id == book_id
     ).first()
 
     if wishlist_item:
-        # Remove from wishlist
         db.delete(wishlist_item)
         db.commit()
-        is_wishlisted = False
-        message = "Book removed from wishlist"
+        return {
+            "data": {"book_id": book_id, "is_wishlisted": False},
+            "message": "Book removed from wishlist"
+        }
     else:
-        # Add to wishlist
         new_wishlist_item = Wishlist(user_id=current_user.id, book_id=book_id)
         db.add(new_wishlist_item)
         db.commit()
-        is_wishlisted = True
-        message = "Book added to wishlist"
-
-    return {
-        "data": {"book_id": book_id, "is_wishlisted": is_wishlisted},
-        "message": message
-    }
+        return {
+            "data": {"book_id": book_id, "is_wishlisted": True},
+            "message": "Book added to wishlist"
+        }
 
 @router.get("/wishlist", response_model=BookListResponse)
 def get_wishlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Fetch all wishlisted books for the user
-    wishlist_items = db.query(Wishlist).filter(Wishlist.user_id == current_user.id).all()
-    wishlisted_book_ids = [item.book_id for item in wishlist_items]
-
-    if not wishlisted_book_ids:
-        return {
-            "data": [],
-            "message": "Wishlist is empty"
-        }
-
-    books = db.query(Book).options(joinedload(Book.owner)).filter(Book.id.in_(wishlisted_book_ids), Book.is_deleted == False).all()
-
-    # All these books are wishlisted
-    for book in books:
+    wishlisted_books = db.query(Book).join(Wishlist).filter(Wishlist.user_id == current_user.id).all()
+    
+    for book in wishlisted_books:
         book.is_wishlisted = True
 
     return {
-        "data": books,
+        "data": wishlisted_books,
         "message": "Wishlist fetched successfully"
     }
 
@@ -356,9 +394,30 @@ def get_my_listings(
             detail="Invalid status parameter. Use 'active', 'sold', or 'all'."
         )
 
-    books = query.all()
+    my_books = query.all()
+    
+    wishlist_book_ids = {item.book_id for item in db.query(Wishlist).filter(Wishlist.user_id == current_user.id).all()}
+    for book in my_books:
+        book.is_wishlisted = book.id in wishlist_book_ids
 
     return {
-        "data": books,
+        "data": my_books,
         "message": f"Successfully retrieved {listing_status} listings."
+    }
+
+@router.get("/get-random-books", response_model=BookListResponse)
+def get_random_books(
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    random_books = db.query(Book).filter(Book.is_deleted == False, Book.is_sold == False).order_by(func.random()).limit(10).all()
+
+    if current_user:
+        wishlist_book_ids = {item.book_id for item in db.query(Wishlist).filter(Wishlist.user_id == current_user.id).all()}
+        for book in random_books:
+            book.is_wishlisted = book.id in wishlist_book_ids
+            
+    return {
+        "data": random_books,
+        "message": "Random books fetched successfully"
     }

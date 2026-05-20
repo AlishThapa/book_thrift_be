@@ -12,6 +12,7 @@ from app.routes.users import router as users_router
 from app.routes.books import router as books_router
 from app.routes.cart import router as cart_router
 from app.routes.bin import router as bin_router
+from app.routes.dashboard import router as dashboard_router
 
 # Create database tables before starting the app
 create_tables()
@@ -68,6 +69,7 @@ app.include_router(users_router)
 app.include_router(books_router)
 app.include_router(cart_router)
 app.include_router(bin_router)
+app.include_router(dashboard_router)
 
 @app.get("/")
 async def root():

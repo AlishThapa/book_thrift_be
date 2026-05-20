@@ -35,5 +35,11 @@ def create_tables():
     except Exception:
         pass # Column likely already exists
         
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE wishlist ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
+    except Exception:
+        pass # Column likely already exists
+        
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")

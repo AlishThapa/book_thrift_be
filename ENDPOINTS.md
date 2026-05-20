@@ -80,6 +80,22 @@ All routes are prefixed with `/api`.
         - `old_password`, `new_password`, `confirm_new_password`
     - Response: `200 OK`
 
+## Dashboard Endpoints
+
+All routes are prefixed with `/api`.
+
+- **GET /api/dashboard** — Get Dashboard Data
+    - Description: Retrieves aggregated data for the main dashboard, including personalized and trending content.
+    - Authentication: Optional (Bearer Token for personalized "Picks for you")
+    - Query Parameters:
+        - `lat` (float, optional) - User's latitude. Required for "Near you".
+        - `lng` (float, optional) - User's longitude. Required for "Near you".
+    - Response: `200 OK` with a dashboard object in `data`. The dashboard object contains:
+        - `near_you`: List of up to 5 books within a 10km radius.
+        - `picks_for_you`: List of up to 5 books based on user's wishlist/purchase history, or random if none.
+        - `just_dropped`: List of up to 5 books created in the last 24 hours.
+        - `trending_this_week`: List of up to 5 books with the most wishlist adds in the last 7 days.
+
 ## Book Endpoints
 
 All routes are prefixed with `/api`.
@@ -95,17 +111,31 @@ All routes are prefixed with `/api`.
         - `quantity` (int)
         - `description` (string)
         - `location` (string)
+        - `latitude` (float, optional)
+        - `longitude` (float, optional)
         - `category` (string)
         - `images` (file, multiple allowed, max 5)
     - Response: `201 Created` with created book object in `data`
 
-- **PUT /api/edit-book/{book_id}** — Edit a book post
-    - Description: Edit a book's details. Only the owner can edit, and sold books cannot be edited.
+- **PUT /api/update-book/{book_id}** — Edit a book post
+    - Description: Edit a book's details. Only the owner can edit.
     - Authentication: Bearer Token
     - Path Parameter:
         - `book_id` (int, required)
-    - Request Body (JSON, all fields optional):
-        - `title`, `condition`, `price`, `quantity`, `description`, `location`, `category`, `images`
+    - Request Format: `multipart/form-data`
+    - Form Fields (all optional):
+        - `title` (string)
+        - `condition` (string: new, like new, used, old)
+        - `price` (float)
+        - `quantity` (int)
+        - `description` (string)
+        - `location` (string)
+        - `latitude` (float)
+        - `longitude` (float)
+        - `category` (string)
+        - `images` (file, multiple allowed, max 5)
+        - `is_sold` (bool)
+        - `is_deleted` (bool)
     - Response: `200 OK` with updated book object in `data`
 
 - **GET /api/delete-book** — Soft-delete a book
@@ -170,7 +200,7 @@ All routes are prefixed with `/api`.
     - Response: `200 OK` with a list of book objects in `data`.
 
 - **POST /api/books/all/recover** — Recover all soft-deleted books
-    - Description: Recovers all books from the user's bin.
+    - Description: Recovers all books from the.
     - Authentication: Bearer Token
     - Response: `200 OK` with a success message.
 

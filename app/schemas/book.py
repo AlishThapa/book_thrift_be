@@ -35,7 +35,8 @@ class BookBase(BaseModel):
         return v
 
 class BookCreate(BookBase):
-    pass
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class BookUpdate(BaseModel):
     title: Optional[str] = None
@@ -58,6 +59,8 @@ class BookResponse(BaseModel):
     quantity: int
     description: str
     location: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     category: str
     images: Optional[List[str]] = []
     is_sold: bool

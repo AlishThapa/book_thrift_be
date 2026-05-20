@@ -14,6 +14,8 @@ class Book(Base):
     quantity = Column(Integer, default=1)
     description = Column(String, nullable=False)
     location = Column(String, nullable=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     category = Column(String, index=True, nullable=False)
     images = Column(JSON, nullable=True)  # List of image URLs/paths (max 5)
     is_sold = Column(Boolean, default=False)
